@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Valentine ❤️ For You</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<style>
+/* ===== 基礎設定 ===== */
+*{margin:0;padding:0;box-sizing:border-box;font-family:"微軟正黑體", sans-serif;}
+
+body{
+ height:100vh;
+ overflow:hidden;
+ /* 背景圖 */
+ background:url("https://images.unsplash.com/photo-1518199266791-5375a83190b7?q=80&w=1600&auto=format&fit=crop")
+ center/cover no-repeat fixed;
+ display:flex;
+ justify-content:center;
+ align-items:center;
+}
+
+/* Three.js 背景容器 */
+#threeBG{
+ position:fixed;
+ inset:0;
+ z-index:-1;
+ pointer-events:none;
+}
+
+/* ===== 主要卡片區 ===== */
+.center{
+ backdrop-filter:blur(15px);
+ background:rgba(255,255,255,0.4);
+ padding:30px;
+ border-radius:28px;
+ box-shadow:0 20px 60px rgba(0,0,0,0.2);
+ text-align:center;
+ width:min(90vw,420px);
+ position:relative;
+ border: 1px solid rgba(255,255,255,0.5);
+ transition: height 0.3s;
+}
+
+h2 { color: #d4004f; margin-bottom: 20px; }
+
+input {
+    padding: 10px;
+    border-radius: 20px;
+    border: 2px solid #ff7aa5;
+    outline: none;
+    text-align: center;
+    font-size: 16px;
+    color: #d4004f;
+    background: rgba(255,255,255,0.8);
+}
+
+button#startBtn, button#openBtn, button#pullBtn {
+    background: #ff477e;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 50px;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 71, 126, 0.4);
+    transition: transform 0.2s;
+}
+button:active { transform: scale(0.95); }
+
+/* ===== 逃跑按鈕 ===== */
+.choice{
+ position:absolute;
+ background:#ff7aa5;
+ color:white;
+ border:none;
+ border-radius:50%;
+ width: 50px;
+ height: 50px;
+ display: flex;
+ align-items: center;
+ justify-content: center;
+ font-size:24px;
+ cursor:pointer;
+ transition:left 0.3s ease-out, top 0.3s ease-out;
+ box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+ z-index: 10;
+}
+
+.loveText{
+ min-height:50px;
+ font-size: 1.2rem;
+ font-weight:bold;
+ color:#c4004f;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ margin-bottom: 20px;
+ text-shadow: 0 2px 10px rgba(255,255,255,0.8);
+}
+
+/* ===== 信封區域 ===== */
+.envelope-container {
+    perspective: 1000px;
+    position: relative;
+    z-index: 5;
+}
+
+.envelope{
+ width:200px;
+ height:130px;
+ background:#f3d1c6;
+ border-radius:0 0 10px 10px;
+ margin:auto;
+ position:relative;
+ box-shadow:0 15px 40px rgba(0,0,0,0.3);
+ z-index: 20; 
+ display: flex;
+ justify-content: center;
+ align-items: flex-end;
+}
+
+.flap{
+ position:absolute;
+ top: 0;
+ width:100%;
+ height:65px;
+ background:#e7b9aa;
+ clip-path:polygon(0 0,100% 0,50% 100%);
+ transform-origin:top;
+ transition: transform 0.6s ease-in-out;
+ z-index: 21;
+}
+
+.envelope.open .flap{ 
+    transform:rotateX(180deg); 
+    z-index: 10;
+}
+
+/* 信紙 - 已調整字體大小與換行設定 */
+.paper{
+ position: absolute;
+ top: 10px;
+ left: 50%;
+ transform: translateX(-50%);
+ width:170px;
+ height:200px;
+ border-radius:5px;
+ background: radial-gradient(#ffe6ea 10%, transparent 10%) 0 0/20px 20px, #fff;
+ box-shadow:0 -5px 20px rgba(0,0,0,0.1);
+ display:flex;
+ justify-content:center;
+ align-items:center;
+ font-family:"標楷體", cursive;
+ font-size: 22px; /* 字體稍微縮小以容納長句 */
+ line-height: 1.5;
+ white-space: pre-wrap; /* 支援換行符號 */
+ text-align: center;
+ color:#d4004f;
+ transition: transform 1s ease-in-out, opacity 0.5s;
+ z-index: 15;
+ opacity: 0;
+ pointer-events: none;
+ padding: 15px; /* 增加內邊距 */
+}
+
+.paper.show{
+ transform: translateX(-50%) translateY(-140px);
+ opacity:1;
+ z-index: 25;
+}
+
+</style>
+</head>
+
+<body>
+
+<canvas id="threeBG"></canvas>
+
+<div class="center" id="app">
+    <h2>輸入妳的名字 💌</h2>
+    <input id="nameInput" placeholder="Name" autocomplete="off"><br><br>
+    <button id="startBtn">開始浪漫旅程</button>
+</div>
+
+<script>
+/* ================= 1. 邏輯流程 ================= */
+const words=[
+    "遇見妳是我最幸運的事 ❤️",
+    "只想每天都陪著妳",
+    "妳笑起來就是我的宇宙",
+    "世界因妳而溫柔",
+    "有妳的地方就是家",
+    "牽著妳的手走到老",
+    "今天比昨天更愛妳",
+    "心跳只為妳加速 💗",
+    "想把全世界都給妳",
+    "未來每一天都有妳就夠了"
+];
+
+let level = 0;
+const MAX = 6; 
+let currentName = "親愛的"; // 儲存名字的變數
+
+const app = document.getElementById("app");
+const nameInput = document.getElementById("nameInput");
+
+document.getElementById("startBtn").onclick = () => {
+    // 獲取輸入的名字，如果沒輸入則預設為"親愛的"
+    currentName = nameInput.value.trim() || "親愛的";
+    
+    // 初始化界面
+    app.innerHTML = `
+      <div class="loveText" id="text">Hello ${currentName} ...</div>
+      <div id="gameArea" style="position:relative; height:300px; width:100%;"></div>
+    `;
+    
+    setTimeout(showLevel, 1000);
+};
+
+// 打字機效果
+function type(text, el, speed = 100, callback) {
+    el.textContent = "";
+    let i = 0;
+    const t = setInterval(() => {
+        el.textContent += text[i++];
+        if (i >= text.length) {
+            clearInterval(t);
+            if (callback) callback();
+        }
+    }, speed);
+}
+
+function showLevel() {
+    const textEl = document.getElementById("text");
+    const box = document.getElementById("gameArea");
+
+    if(!textEl || !box) return;
+
+    type(words[level % words.length], textEl);
+
+    box.innerHTML = "";
+
+    if (level >= MAX) {
+        showEnvelope(box);
+        return;
+    }
+
+    const count = 1 + Math.min(level, 5);
+    
+    for (let i = 0; i < count; i++) {
+        const b = document.createElement("button");
+        b.className = "choice";
+        b.textContent = "💖";
+
+        move(b, box);
+
+        b.onmouseenter = (e) => {
+            setTimeout(() => move(b, box), 150 + level * 20);
+        };
+        
+        b.ontouchstart = (e) => {
+             if(Math.random() > 0.3) {
+                 move(b, box);
+             }
+        };
+
+        b.onclick = () => {
+            level++;
+            showLevel();
+        };
+
+        box.appendChild(b);
+    }
+}
+
+function move(el, parent) {
+    const w = parent.clientWidth - 60;
+    const h = parent.clientHeight - 60;
+    
+    const newLeft = Math.abs(Math.random() * w);
+    const newTop = Math.abs(Math.random() * h);
+
+    el.style.left = newLeft + "px";
+    el.style.top = newTop + "px";
+}
+
+/* ================= 2. 信封流程 (修改處) ================= */
+
+function showEnvelope(box) {
+    box.innerHTML = `
+    <div style="height: 100%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <div class="envelope-container">
+            <div class="paper" id="paper"></div>
+            <div class="envelope" id="env">
+                <div class="flap"></div>
+            </div>
+        </div>
+        <br>
+        <div style="z-index:50; position:relative;">
+            <button id="openBtn">打開信封</button>
+            <button id="pullBtn" style="display:none">抽出信紙</button>
+        </div>
+    </div>
+    `;
+
+    const env = document.getElementById("env");
+    const openBtn = document.getElementById("openBtn");
+    const pullBtn = document.getElementById("pullBtn");
+    const paper = document.getElementById("paper");
+    const textEl = document.getElementById("text");
+
+    textEl.textContent = "有一封信給妳...";
+
+    openBtn.onclick = () => {
+        env.classList.add("open");
+        openBtn.style.display = "none";
+        setTimeout(() => {
+            pullBtn.style.display = "inline-block";
+        }, 600);
+    };
+
+    // 這裡修改了最後的文字邏輯
+    pullBtn.onclick = () => {
+        pullBtn.style.display = "none";
+        paper.classList.add("show");
+        
+        // 組合更浪漫的文字
+        const finalMessage = `${currentName}，\n願歲月溫柔，\n與妳共白頭 ❤️`;
+        
+        // 等信紙抽出來後打字
+        setTimeout(() => {
+             type(finalMessage, paper, 150);
+        }, 1000);
+    };
+}
+
+/* ================= 3. Three.js 背景 ================= */
+
+const canvas = document.querySelector('#threeBG');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+camera.position.z = 60;
+
+function createHeartTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ff99b3';
+    ctx.beginPath();
+    const x = 32, y = 32;
+    ctx.moveTo(x, y + 15);
+    ctx.bezierCurveTo(x - 20, y - 5, x - 35, y - 25, x, y - 30);
+    ctx.bezierCurveTo(x + 35, y - 25, x + 20, y - 5, x, y + 15);
+    ctx.fill();
+    return new THREE.CanvasTexture(canvas);
+}
+
+const tex = createHeartTexture();
+const petals = [];
+
+for (let i = 0; i < 150; i++) {
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const mat = new THREE.MeshBasicMaterial({ 
+        map: tex, 
+        transparent: true, 
+        opacity: 0.8, 
+        side: THREE.DoubleSide 
+    });
+    const m = new THREE.Mesh(geo, mat);
+
+    m.position.set(
+        (Math.random() - 0.5) * 120, 
+        (Math.random() - 0.5) * 80, 
+        (Math.random() - 0.5) * 40
+    );
+    
+    m.userData = {
+        vx: (Math.random() - 0.5) * 0.1,
+        vy: 0.05 + Math.random() * 0.1, 
+        vrx: (Math.random() - 0.5) * 0.05, 
+        vry: (Math.random() - 0.5) * 0.05
+    };
+
+    scene.add(m);
+    petals.push(m);
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    petals.forEach(p => {
+        p.position.y -= p.userData.vy;
+        p.position.x += Math.sin(Date.now() * 0.001 + p.position.y) * 0.02;
+        p.rotation.x += p.userData.vrx;
+        p.rotation.y += p.userData.vry;
+
+        if (p.position.y < -50) {
+            p.position.y = 50;
+            p.position.x = (Math.random() - 0.5) * 120;
+        }
+    });
+
+    renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+
+</script>
+
+</body>
+</html>
